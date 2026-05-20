@@ -260,7 +260,7 @@ Flag: virtual_host_metadata, state: enabled
 
 Далее в обоих инстансах выполняю команду:
 
-<img src = "img/hw_11047.png" width = 80%>
+<img src = "img/hw_11047.png" width = 90%>
 
 Затем останавливаю мастер-инстанс и меняю в конфиге для скрипта URI на порт для второго инстанса:
 
@@ -284,7 +284,7 @@ Flag: virtual_host_metadata, state: enabled
 
 Для выполнения этого задания я уже поднял две виртуалки в yandex.cloud:
 
-<img src = "img/hw_11050.png" width = 70%>
+<img src = "img/hw_11050.png" width = 100%>
 
 Проинициализирован ansible.cfg файл, созданы плейбук и inventory.ini \
 Все файлы есть в этом репозитории \
@@ -299,4 +299,4 @@ Flag: virtual_host_metadata, state: enabled
 
 Ну и проверяет статус RMQ кластера:
 
-<img src = "img/hw_11053.png" width = 70%>
+<img src = "img/hw_11053.png" width = 80%>
