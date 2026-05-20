@@ -1,0 +1,97 @@
+---
+- name: Install and configure RabbitMQ cluster
+  hosts: rabbitmq
+  become: true
+
+  vars:
+    rabbitmq_master: "{{ groups['rabbitmq'][0] }}"
+
+  tasks:
+    - name: Set hostname
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: Add RabbitMQ nodes to /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '.*\s{{ item }}$'
+        line: "{{ hostvars[item].ansible_host }} {{ item }}"
+        state: present
+      loop: "{{ groups['rabbitmq'] }}"
+
+    - name: Install RabbitMQ
+      ansible.builtin.apt:
+        name: rabbitmq-server
+        state: present
+        update_cache: true
+
+    - name: Stop RabbitMQ before setting Erlang cookie
+      ansible.builtin.service:
+        name: rabbitmq-server
+        state: stopped
+
+    - name: Set same Erlang cookie on all nodes
+      ansible.builtin.copy:
+        content: "{{ rabbitmq_erlang_cookie }}"
+        dest: /var/lib/rabbitmq/.erlang.cookie
+        owner: rabbitmq
+        group: rabbitmq
+        mode: "0400"
+
+    - name: Start and enable RabbitMQ
+      ansible.builtin.service:
+        name: rabbitmq-server
+        state: started
+        enabled: true
+
+    - name: Enable RabbitMQ management plugin
+      ansible.builtin.command:
+        cmd: rabbitmq-plugins enable rabbitmq_management
+      register: enable_management
+      changed_when: "'already enabled' not in enable_management.stdout"
+
+    - name: Restart RabbitMQ after enabling plugins
+      ansible.builtin.service:
+        name: rabbitmq-server
+        state: restarted
+
+    - name: Create RabbitMQ admin user
+      ansible.builtin.command:
+        cmd: rabbitmqctl add_user {{ rabbitmq_user }} {{ rabbitmq_password }}
+      register: add_user_result
+      failed_when:
+        - add_user_result.rc != 0
+        - "'already_exists' not in add_user_result.stderr"
+      changed_when: "'already_exists' not in add_user_result.stderr"
+      when: inventory_hostname == rabbitmq_master
+
+    - name: Set administrator tag
+      ansible.builtin.command:
+        cmd: rabbitmqctl set_user_tags {{ rabbitmq_user }} administrator
+      when: inventory_hostname == rabbitmq_master
+
+    - name: Set user permissions
+      ansible.builtin.command:
+        cmd: rabbitmqctl set_permissions -p / {{ rabbitmq_user }} ".*" ".*" ".*"
+      when: inventory_hostname == rabbitmq_master
+
+    - name: Check cluster status
+      ansible.builtin.command:
+        cmd: rabbitmqctl cluster_status
+      register: cluster_status
+      changed_when: false
+
+    - name: Join node to RabbitMQ cluster
+      ansible.builtin.shell: |
+        rabbitmqctl stop_app
+        rabbitmqctl reset
+        rabbitmqctl join_cluster rabbit@{{ rabbitmq_master }}
+        rabbitmqctl start_app
+      when:
+        - inventory_hostname != rabbitmq_master
+        - "'rabbit@' + rabbitmq_master not in cluster_status.stdout"
+
+    - name: Create ha-all policy
+      ansible.builtin.command:
+        cmd: rabbitmqctl set_policy ha-all ".*" '{"ha-mode":"all","ha-sync-mode":"automatic"}' --apply-to all
+      when: inventory_hostname == rabbitmq_master
