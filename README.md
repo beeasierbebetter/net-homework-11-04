@@ -260,7 +260,7 @@ Flag: virtual_host_metadata, state: enabled
 
 Далее в обоих инстансах выполняю команду:
 
-<img src = "img/hw_11047.png" width = 70%>
+<img src = "img/hw_11047.png" width = 80%>
 
 Затем останавливаю мастер-инстанс и меняю в конфиге для скрипта URI на порт для второго инстанса:
 
